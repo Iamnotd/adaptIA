@@ -1,0 +1,49 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Local databases and runtime state
+*.db
+*.sqlite
+*.sqlite3
+adaptia_memory.db
+logs/
+
+# Temporary audio and generated media
+*.wav
+*.mp3
+*.ogg
+*.flac
+*.tmp
+*.temp
+captura_*.png
+
+# Project/runtime temporary folders
+temp/
+tmp/
+adaptIA_temp/
+
+# Windows and editor files
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.vscode/
+.idea/
+
+# Build and packaging outputs
+build/
+dist/
+*.egg-info/
