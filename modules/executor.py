@@ -19,6 +19,8 @@ class Executor:
         Cualquier excepción es capturada para que adaptIA nunca se caiga por un error
         en una acción individual.
         """
+        parametros = parametros or {}
+
         try:
             objetivo = parametros.get("objetivo", "")
             contenido = parametros.get("contenido", "")
@@ -81,5 +83,5 @@ class Executor:
                 return False, "Esa acción todavía no está disponible."
 
         except Exception as e:
-            logger.error(f"Error ejecutando acción '{intencion}': {e}")
+            logger.exception(f"Error ejecutando acción '{intencion}': {e}")
             return False, "Ocurrió un error inesperado al ejecutar la acción."

@@ -5,9 +5,11 @@ Detecta la palabra clave "Orion" y graba el comando completo del usuario.
 Usa automaticamente el microfono predeterminado del sistema Windows.
 """
 
-import speech_recognition as sr
-import unicodedata
 import os
+import unicodedata
+
+import speech_recognition as sr
+
 from config import WAKE_WORD, SILENCE_THRESHOLD_SECONDS, MAX_RECORDING_SECONDS
 from modules.logger import get_logger
 
@@ -86,10 +88,10 @@ class Listener:
                 except sr.UnknownValueError:
                     continue
                 except sr.RequestError as e:
-                    logger.error(f"Error de conexion: {e}")
+                    logger.error(f"Error de conexión con el servicio de reconocimiento de voz: {e}")
                     continue
                 except Exception as e:
-                    logger.error(f"Error en escucha pasiva: {e}")
+                    logger.exception(f"Error inesperado en escucha pasiva: {e}")
                     continue
 
     def grabar_comando(self):
@@ -107,6 +109,9 @@ class Listener:
             except sr.WaitTimeoutError:
                 logger.warning("Tiempo de espera agotado.")
                 return None
+            except Exception as e:
+                logger.exception(f"Error grabando comando de voz: {e}")
+                return None
 
     def guardar_audio_temporal(self, audio, ruta_wav):
         """Guarda el audio capturado como archivo .wav temporal para Whisper."""
@@ -119,5 +124,5 @@ class Listener:
             logger.info(f"Audio guardado en: {ruta_abs}")
             return ruta_abs
         except Exception as e:
-            logger.error(f"Error guardando audio: {e}")
+            logger.exception(f"Error guardando audio temporal en '{ruta_wav}': {e}")
             return None

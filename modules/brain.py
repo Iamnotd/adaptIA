@@ -6,6 +6,7 @@ y generar respuestas en lenguaje natural.
 """
 
 import json
+
 import requests
 from config import GROQ_API_KEY, GROQ_MODEL, MAX_TOKENS, ASSISTANT_NAME
 from modules.logger import get_logger
@@ -59,6 +60,7 @@ class Brain:
         Envía el texto del usuario a Groq junto con el contexto de interacciones
         recientes, y devuelve un diccionario con la intención clasificada.
         """
+        texto_respuesta = ""
         contexto_texto = ""
         if contexto_reciente:
             lineas = []
@@ -96,17 +98,28 @@ class Brain:
                     texto_respuesta = texto_respuesta[4:].strip()
 
             data = json.loads(texto_respuesta)
+            if not isinstance(data, dict):
+                logger.error(f"Groq devolvió JSON válido, pero no era un objeto: {data}")
+                return self._respuesta_desconocida()
+
             logger.debug(f"Intención clasificada por Groq: {data}")
             return data
 
         except json.JSONDecodeError as e:
             logger.error(f"Error parseando JSON de Groq: {e} | Respuesta cruda: {texto_respuesta}")
             return self._respuesta_desconocida()
+        except requests.exceptions.HTTPError as e:
+            status = e.response.status_code if e.response is not None else "desconocido"
+            logger.error(f"Groq API respondió con HTTP {status}: {e}")
+            return self._respuesta_desconocida(error=True)
         except requests.exceptions.Timeout:
             logger.error("Timeout conectando con Groq API")
             return self._respuesta_desconocida(error=True)
+        except (KeyError, IndexError, TypeError) as e:
+            logger.error(f"Respuesta inesperada de Groq API: {e}")
+            return self._respuesta_desconocida(error=True)
         except Exception as e:
-            logger.error(f"Error comunicándose con Groq API: {e}")
+            logger.exception(f"Error comunicándose con Groq API: {e}")
             return self._respuesta_desconocida(error=True)
 
     def _respuesta_desconocida(self, error=False):

@@ -83,8 +83,8 @@ def ciclo_voz():
         logger.info("Orion detenido.")
         speaker.hablar("Hasta luego.")
     except Exception as e:
-        logger.error(f"Error critico: {e}")
-        speaker.hablar("Tuve un error critico.")
+        logger.exception(f"Error crítico en el ciclo de voz: {e}")
+        speaker.hablar("Tuve un error crítico.")
     finally:
         memory.cerrar()
 
@@ -96,5 +96,5 @@ if __name__ == "__main__":
         hilo_voz.start()
         iniciar_menu()
     except Exception as e:
-        logger.warning(f"Menu no disponible, corriendo sin interfaz: {e}")
+        logger.warning(f"Menú no disponible, corriendo sin interfaz: {e}")
         ciclo_voz()
