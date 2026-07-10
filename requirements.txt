@@ -1,0 +1,34 @@
+# ===== adaptIA - Dependencias =====
+# Instalar con: pip install -r requirements.txt
+
+# --- Audio y reconocimiento de voz ---
+pyaudio==0.2.14
+SpeechRecognition==3.10.4
+openai-whisper==20231117
+pvporcupine==3.0.2
+
+# --- IA / LLM ---
+groq==0.9.0
+
+# --- Síntesis de voz ---
+pyttsx3==2.90
+elevenlabs==1.9.0
+
+# --- Control del sistema Windows ---
+pyautogui==0.9.54
+pygetwindow==0.0.9
+pywinauto==0.6.8
+psutil==5.9.8
+pyperclip==1.8.2
+
+# --- Comunicaciones ---
+twilio==9.3.7
+
+# --- Base de datos / memoria ---
+SQLAlchemy==2.0.35
+
+# --- Utilidades ---
+python-dotenv==1.0.1
+loguru==0.7.2
+requests==2.32.3
+numpy==1.26.4

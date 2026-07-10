@@ -1,0 +1,91 @@
+"""
+modules/action_manager.py
+Gestor de confirmación: NUNCA ejecuta una acción directamente.
+Antes de ejecutar, le dice al usuario qué acción está a punto de realizar
+y espera una respuesta verbal de confirmación o cancelación.
+
+Acciones especialmente sensibles (apagar/reiniciar el equipo) requieren
+una doble confirmación por seguridad.
+"""
+
+from config import CONFIRM_WORDS, CANCEL_WORDS
+from modules.logger import get_logger
+
+logger = get_logger()
+
+ACCIONES_DOBLE_CONFIRMACION = {"apagar_equipo", "reiniciar_equipo"}
+
+
+class ActionManager:
+    """
+    Orquesta el flujo: anunciar la acción -> escuchar confirmación -> ejecutar o cancelar.
+    Depende de un objeto 'speaker' (voz), 'listener' (escucha) y 'transcriber' (texto)
+    que se le inyectan desde main.py.
+    """
+
+    def __init__(self, speaker, listener, transcriber, executor):
+        self.speaker = speaker
+        self.listener = listener
+        self.transcriber = transcriber
+        self.executor = executor
+
+    def _escuchar_respuesta_si_no(self):
+        """Graba y transcribe una respuesta corta del usuario (sí/no)."""
+        audio = self.listener.grabar_comando()
+        if audio is None:
+            return ""
+        import os
+        from config import TEMP_DIR
+        ruta_temp = os.path.join(TEMP_DIR, "confirmacion.wav")
+        self.listener.guardar_audio_temporal(audio, ruta_temp)
+        texto, _ = self.transcriber.transcribir(ruta_temp)
+        return texto.lower().strip()
+
+    def _es_confirmacion(self, texto):
+        return any(palabra in texto for palabra in CONFIRM_WORDS)
+
+    def _es_cancelacion(self, texto):
+        return any(palabra in texto for palabra in CANCEL_WORDS)
+
+    def procesar_intencion(self, data_intencion):
+        """
+        Recibe el JSON de intención clasificado por brain.py y gestiona
+        todo el flujo de confirmación antes de ejecutar la acción real.
+        """
+        intencion = data_intencion.get("intencion", "desconocido")
+
+        # Caso: solo conversación, no requiere confirmación ni ejecución de acciones
+        if intencion == "conversacion" or not data_intencion.get("confirmacion_requerida", False):
+            respuesta = data_intencion.get("respuesta_hablada", "")
+            if respuesta:
+                self.speaker.hablar(respuesta)
+            return intencion, data_intencion.get("parametros", {}), respuesta, True
+
+        if intencion == "desconocido":
+            self.speaker.hablar(data_intencion.get("respuesta_hablada", "No entendí ese comando."))
+            return intencion, {}, "No se reconoció el comando.", False
+
+        # Anunciar la acción y pedir confirmación
+        mensaje_confirmacion = data_intencion.get("mensaje_confirmacion", "¿Confirmas esta acción?")
+        self.speaker.hablar(mensaje_confirmacion)
+
+        respuesta_usuario = self._escuchar_respuesta_si_no()
+        logger.info(f"Respuesta de confirmación del usuario: '{respuesta_usuario}'")
+
+        if not self._es_confirmacion(respuesta_usuario):
+            self.speaker.hablar("De acuerdo, he cancelado la acción.")
+            return intencion, data_intencion.get("parametros", {}), "Acción cancelada por el usuario.", False
+
+        # Doble confirmación para acciones críticas (apagar, reiniciar)
+        if intencion == "control_sistema" and data_intencion.get("parametros", {}).get("objetivo") in ACCIONES_DOBLE_CONFIRMACION:
+            self.speaker.hablar("Esta acción cerrará tus programas abiertos. ¿Estás completamente seguro?")
+            segunda_respuesta = self._escuchar_respuesta_si_no()
+            if not self._es_confirmacion(segunda_respuesta):
+                self.speaker.hablar("Acción cancelada por seguridad.")
+                return intencion, data_intencion.get("parametros", {}), "Cancelada en doble confirmación.", False
+
+        # Ejecutar la acción real
+        exitoso, resultado_texto = self.executor.ejecutar(intencion, data_intencion.get("parametros", {}))
+        self.speaker.hablar(resultado_texto)
+
+        return intencion, data_intencion.get("parametros", {}), resultado_texto, exitoso
