@@ -6,8 +6,8 @@ con respaldo automático a pyttsx3 (offline, gratis) si no está disponible.
 """
 
 import pyttsx3
-
-from config import ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID
+import os
+from config import ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID, TEMP_DIR
 from modules.logger import get_logger
 
 logger = get_logger()
@@ -56,11 +56,11 @@ class Speaker:
                 self.engine.say(texto)
                 self.engine.runAndWait()
         except Exception as e:
-            logger.exception(f"Error al reproducir voz: {e}")
+            logger.error(f"Error al reproducir voz: {e}")
             # Respaldo de emergencia si ElevenLabs falla en tiempo real
             try:
                 engine = pyttsx3.init()
                 engine.say(texto)
                 engine.runAndWait()
             except Exception as e2:
-                logger.exception(f"Error también en el respaldo pyttsx3: {e2}")
+                logger.error(f"Error también en el respaldo pyttsx3: {e2}")

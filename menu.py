@@ -5,22 +5,27 @@ Se ejecuta en segundo plano mientras adaptIA escucha.
 Muestra el estado del sistema, animación de voz y logs en tiempo real.
 """
 
+import tkinter as tk
 import math
-import os
+import threading
+import time
 import queue
 import sys
-import tkinter as tk
+import os
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 COLOR_BG = "#000000"
+COLOR_ORB_BASE = "#1a0a00"
 COLOR_ORB_RING1 = "#ff6600"
 COLOR_ORB_RING2 = "#ff9900"
 COLOR_ORB_RING3 = "#ffcc00"
+COLOR_ORB_GLOW = "#ff4400"
 COLOR_TEXT = "#ff8800"
 COLOR_TEXT_DIM = "#663300"
 COLOR_GREEN = "#00ff88"
 COLOR_LOG = "#ff6600"
+FONT_MAIN = ("Courier New", 11)
 FONT_TITLE = ("Courier New", 18, "bold")
 FONT_STATUS = ("Courier New", 10)
 
@@ -121,6 +126,7 @@ class MenuAdaptIA:
         # Glow exterior pulsante
         glow_r = r + 30 + int(math.sin(self.pulso) * 12)
         for i in range(6, 0, -1):
+            alpha_hex = format(int(i * 8), '02x')
             c.create_oval(
                 cx - glow_r - i*4, cy - glow_r - i*4,
                 cx + glow_r + i*4, cy + glow_r + i*4,

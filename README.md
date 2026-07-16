@@ -1,234 +1,128 @@
 # adaptIA
 
-adaptIA es un asistente de escritorio por voz para Windows. Escucha una palabra de activacion interna (`orion`), graba el comando del usuario, lo transcribe con Whisper local, clasifica la intencion con Groq y ejecuta acciones del sistema solo despues de pedir confirmacion.
+Asistente de inteligencia artificial de escritorio para Windows 10/11, controlado por voz,
+con micrófono siempre abierto, palabra de activación, y confirmación antes de ejecutar
+cualquier acción en el sistema.
 
-El proyecto esta pensado para uso local en Windows 10/11 y combina voz, una interfaz visual sencilla y acciones automatizadas sobre aplicaciones, navegador, archivos, sistema y canales de comunicacion.
+---
 
-## Que hace
+## Requisitos previos
 
-- Escucha el microfono en segundo plano esperando la palabra `orion`.
-- Transcribe comandos hablados en espanol con Whisper.
-- Usa Groq para convertir el texto del usuario en una intencion estructurada.
-- Pide confirmacion por voz antes de ejecutar acciones.
-- Ejecuta acciones en Windows: abrir apps, navegar, buscar, enviar mensajes, manipular archivos y consultar/controlar el sistema.
-- Habla las respuestas con ElevenLabs si esta configurado, o con `pyttsx3` como fallback offline.
-- Guarda interacciones recientes en SQLite para dar contexto al modelo.
-- Muestra una ventana Tkinter con estado visual y log basico de actividad.
+- Windows 10 (build 1903+) o Windows 11
+- Python 3.11 de 64 bits instalado y agregado al PATH ([descargar aquí](https://www.python.org/downloads/))
+- Micrófono funcional
+- Conexión a internet (para Claude API, Whisper en línea de respaldo, Twilio, etc.)
 
-## Flujo general
+---
 
-1. `main.py` inicia el ciclo de voz y la interfaz Tkinter.
-2. `modules/listener.py` escucha el microfono y detecta la palabra `orion`.
-3. El comando se guarda como audio temporal en `C:\adaptIA_temp`.
-4. `modules/transcriber.py` usa Whisper local para transcribir el audio.
-5. `modules/memory.py` entrega contexto reciente desde SQLite.
-6. `modules/brain.py` envia el comando y contexto a Groq.
-7. Groq responde con un JSON de intencion y parametros.
-8. `modules/action_manager.py` anuncia la accion y espera confirmacion verbal.
-9. `modules/executor.py` despacha la accion hacia `actions/`.
-10. El resultado se habla al usuario y se guarda en memoria.
+## Instalación
 
-## Tecnologias usadas
+1. Descomprime esta carpeta `adaptIA` en tu computadora (por ejemplo en `C:\adaptIA`)
+2. Haz doble clic en **setup.bat** y espera a que termine (instala Python deps automáticamente)
+3. Abre el archivo **.env** con el Bloc de Notas o VS Code y pega tus API keys (ver abajo cómo conseguirlas)
+4. Haz doble clic en **start.bat** para iniciar adaptIA
 
-- Python 3.11+
-- Tkinter para la interfaz visual local.
-- SpeechRecognition y PyAudio para captura de audio.
-- Whisper local (`openai-whisper`) para transcripcion.
-- Groq API para clasificacion de intenciones.
-- SQLite + SQLAlchemy para memoria persistente.
-- ElevenLabs para voz de alta calidad cuando hay API key.
-- pyttsx3 como voz offline de respaldo.
-- Twilio para SMS, WhatsApp y llamadas.
-- SMTP/IMAP para correo.
-- psutil, pyautogui, pycaw y comtypes para acciones del sistema Windows.
+---
 
-## Estructura de carpetas
+## Cómo obtener cada API key
 
-```text
+### Claude API (obligatorio, es el cerebro de adaptIA)
+1. Ve a https://console.anthropic.com y crea una cuenta
+2. Ve a **API Keys → Create Key**
+3. Copia la key y pégala en `.env` en la línea `CLAUDE_API_KEY=`
+
+### ElevenLabs (opcional, voz de alta calidad — si se deja vacío usa voz del sistema)
+1. Ve a https://elevenlabs.io y crea una cuenta
+2. Ve a tu perfil → API Keys
+3. Elige una voz en la sección "Voices" y copia su Voice ID
+4. Pega ambos en `.env`
+
+### Twilio (SMS, WhatsApp y llamadas)
+1. Ve a https://www.twilio.com/try-twilio y crea una cuenta gratis
+2. Verifica tu número de teléfono real
+3. En el panel principal copia **Account SID** y **Auth Token**
+4. Ve a **Phone Numbers → Manage → Buy a Number** para conseguir tu número Twilio
+5. Para WhatsApp: ve a **Messaging → Try it out → Send a WhatsApp message** y activa el Sandbox
+6. Pega todos los datos en `.env`
+
+### Correo (Gmail recomendado)
+1. Activa la verificación en dos pasos en tu cuenta de Gmail
+2. Ve a https://myaccount.google.com/apppasswords y genera una "contraseña de aplicación"
+3. Usa esa contraseña (no la de tu cuenta normal) en `.env` en `EMAIL_PASSWORD`
+
+---
+
+## Cómo usar adaptIA
+
+1. Ejecuta `start.bat`. Verás el mensaje "adaptIA está activo y escuchando en segundo plano."
+2. Di **"Orion"** en voz alta. Escucharás "Dime."
+3. Di tu comando, por ejemplo: *"abre Chrome"* o *"envía un correo a juan@gmail.com diciendo que llego tarde"*
+4. adaptIA te dirá qué acción va a realizar y pedirá confirmación: *"Estoy a punto de abrir Chrome, ¿confirmas?"*
+5. Responde **"sí"** para ejecutar o **"no"** para cancelar
+
+Para detener adaptIA por completo, presiona `Ctrl + C` en la ventana de la consola.
+
+---
+
+## Comandos de ejemplo
+
+- "adaptIA, abre Word"
+- "adaptIA, cierra Spotify"
+- "adaptIA, busca en internet recetas de pasta"
+- "adaptIA, abre la página de YouTube"
+- "adaptIA, envía un correo a [nombre] sobre [tema]"
+- "adaptIA, manda un WhatsApp a [número] diciendo [mensaje]"
+- "adaptIA, llama a [número]"
+- "adaptIA, toma una captura de pantalla"
+- "adaptIA, dime el estado del sistema"
+- "adaptIA, sube el volumen al 70 por ciento"
+
+---
+
+## Estructura del proyecto
+
+```
 adaptIA/
-|-- main.py                  # Punto de entrada principal
-|-- config.py                # Configuracion global y variables de entorno
-|-- menu.py                  # Interfaz visual Tkinter
-|-- requirements.txt         # Dependencias Python
-|-- setup.bat                # Instalador para Windows
-|-- start.bat                # Arranque rapido del asistente
-|-- .env                     # Credenciales locales, no versionar
-|-- modules/
-|   |-- listener.py          # Microfono, palabra de activacion y grabacion
-|   |-- transcriber.py       # Transcripcion con Whisper
-|   |-- brain.py             # Clasificacion de intenciones con Groq
-|   |-- action_manager.py    # Confirmacion antes de ejecutar acciones
-|   |-- executor.py          # Enrutador hacia acciones concretas
-|   |-- speaker.py           # Voz con ElevenLabs o pyttsx3
-|   |-- memory.py            # Memoria persistente SQLite
-|   `-- logger.py            # Logs con loguru
-`-- actions/
-    |-- apps.py              # Abrir y cerrar aplicaciones
-    |-- browser.py           # Abrir URLs y busquedas web
-    |-- communicator.py      # Correo, SMS, WhatsApp y llamadas
-    |-- files.py             # Gestion de archivos y carpetas
-    `-- system.py            # Capturas, volumen, info y energia del sistema
+├── main.py                  # Punto de entrada principal
+├── config.py                # Configuración global
+├── .env                     # Tus API keys (NO compartir)
+├── requirements.txt         # Dependencias de Python
+├── setup.bat                # Instalador automático
+├── start.bat                # Iniciador de adaptIA
+├── modules/
+│   ├── listener.py          # Captura de audio y palabra clave
+│   ├── transcriber.py       # Transcripción con Whisper
+│   ├── brain.py             # Procesamiento con Claude API
+│   ├── action_manager.py    # Flujo de confirmación
+│   ├── executor.py          # Ejecución de acciones
+│   ├── speaker.py           # Texto a voz
+│   ├── memory.py            # Memoria persistente (SQLite)
+│   └── logger.py            # Sistema de logs
+└── actions/
+    ├── apps.py               # Abrir/cerrar aplicaciones
+    ├── browser.py            # Navegador y búsquedas
+    ├── communicator.py       # Correos, SMS, WhatsApp, llamadas
+    ├── files.py               # Gestión de archivos
+    └── system.py             # Control del sistema
 ```
 
-## Variables de entorno
+---
 
-Crea un archivo `.env` en la raiz del proyecto. Las variables disponibles son:
+## Solución de problemas
 
-```env
-GROQ_API_KEY=
+**"No se reconoce pyaudio" al instalar:**
+Si `pip install pyaudio` falla en Windows, descarga el archivo `.whl` precompilado desde
+https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio que coincida con tu versión de Python,
+e instálalo con `pip install nombre_del_archivo.whl`
 
-ELEVENLABS_API_KEY=
-ELEVENLABS_VOICE_ID=
+**El micrófono no detecta la palabra clave:**
+Verifica que el micrófono correcto esté seleccionado como predeterminado en la configuración
+de sonido de Windows. adaptIA usa el micrófono predeterminado del sistema.
 
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_PHONE_NUMBER=
-TWILIO_WHATSAPP_NUMBER=
+**Whisper tarda mucho en cargar:**
+La primera vez que ejecutas adaptIA, Whisper descarga el modelo `base` (puede tardar varios minutos
+según tu internet). Las siguientes veces será instantáneo porque queda en caché local.
 
-EMAIL_ADDRESS=
-EMAIL_PASSWORD=
-EMAIL_SMTP_SERVER=smtp.gmail.com
-EMAIL_SMTP_PORT=587
-```
-
-Variables obligatorias para el flujo base:
-
-- `GROQ_API_KEY`: necesaria para clasificar comandos con Groq.
-
-Variables opcionales:
-
-- `ELEVENLABS_API_KEY` y `ELEVENLABS_VOICE_ID`: activan voz de ElevenLabs. Si faltan, se usa `pyttsx3`.
-- Variables de Twilio: necesarias solo para SMS, WhatsApp y llamadas.
-- Variables de correo: necesarias solo para enviar o leer correos.
-
-## Instalacion
-
-Requisitos:
-
-- Windows 10/11.
-- Python 3.11+ agregado al `PATH`.
-- Microfono funcional.
-- Conexion a internet para Groq, deteccion con Google SpeechRecognition, instalacion inicial de Whisper y servicios externos.
-
-Instalacion recomendada:
-
-```bat
-python -m venv .venv
-.venv\Scripts\activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-Tambien puedes ejecutar:
-
-```bat
-setup.bat
-```
-
-## Ejecucion
-
-Con entorno virtual activo:
-
-```bat
-python main.py
-```
-
-O con el script incluido:
-
-```bat
-start.bat
-```
-
-Uso basico:
-
-1. Inicia el proyecto.
-2. Di `orion`.
-3. Espera la respuesta "Dime".
-4. Di el comando.
-5. Confirma con "si" o cancela con "no".
-
-Ejemplos:
-
-- "orion, abre Chrome"
-- "orion, busca recetas de pasta"
-- "orion, abre youtube.com"
-- "orion, envia un correo a alguien@example.com diciendo que llego tarde"
-- "orion, manda un WhatsApp a +502..."
-- "orion, toma una captura de pantalla"
-- "orion, dime el estado del sistema"
-- "orion, sube el volumen al 70 por ciento"
-
-## Acciones disponibles
-
-Aplicaciones:
-
-- Abrir aplicaciones conocidas como Chrome, Edge, Word, Excel, PowerPoint, Notepad, Spotify, WhatsApp, VS Code, Discord y Outlook.
-- Cerrar aplicaciones buscando procesos activos.
-
-Navegador:
-
-- Abrir URLs.
-- Buscar en Google, YouTube o Bing.
-
-Comunicacion:
-
-- Enviar correos por SMTP.
-- Leer correos no leidos por IMAP.
-- Enviar SMS con Twilio.
-- Enviar WhatsApp con Twilio.
-- Realizar llamadas con Twilio.
-
-Archivos:
-
-- Crear carpetas.
-- Buscar archivos.
-- Abrir archivos.
-- Mover o copiar archivos.
-- Eliminar archivos o carpetas.
-
-Sistema:
-
-- Tomar capturas de pantalla.
-- Consultar CPU, RAM y bateria.
-- Ajustar volumen.
-- Apagar, reiniciar o suspender el equipo.
-
-## Notas de seguridad
-
-- Todas las acciones que ejecutan cambios pasan por confirmacion verbal.
-- Apagar y reiniciar requieren doble confirmacion.
-- Las acciones de archivos pueden eliminar carpetas completas; usalas con cuidado.
-- Las acciones de comunicacion pueden enviar mensajes, correos o llamadas reales si las credenciales estan configuradas.
-- El modelo de Groq propone intenciones y parametros; antes de ampliar acciones conviene validar rutas, correos, telefonos, URLs y nombres de aplicaciones.
-- No compartas `.env`. Contiene claves y credenciales privadas.
-
-## Estado actual del proyecto
-
-Estado: prototipo funcional local para Windows.
-
-Funciona como arquitectura modular, pero hay puntos pendientes para fases futuras:
-
-- Endurecer validaciones antes de acciones destructivas.
-- Mejorar manejo de errores en microfono, Groq y Whisper.
-- Revisar dependencias no usadas historicamente.
-- Unificar textos visibles entre `adaptIA` y `Orion`.
-- Corregir textos con caracteres rotos en archivos Python si aparecen en consola o UI.
-
-## Solucion de problemas
-
-PyAudio falla al instalar:
-
-- En Windows puede requerir wheel precompilado o herramientas de compilacion. Prueba primero con `pip install -r requirements.txt`.
-
-Whisper tarda en iniciar:
-
-- La primera ejecucion puede descargar el modelo local. Despues queda en cache.
-
-No detecta `orion`:
-
-- Verifica el microfono predeterminado de Windows.
-- Recuerda que la deteccion actual usa `SpeechRecognition` con el servicio de Google, por lo que requiere internet.
-
-No habla con ElevenLabs:
-
-- Revisa `ELEVENLABS_API_KEY` y `ELEVENLABS_VOICE_ID`. Si faltan, el sistema deberia usar `pyttsx3`.
+**Error de autenticación en Gmail:**
+Gmail bloquea contraseñas normales por seguridad. Debes usar una "contraseña de aplicación"
+generada específicamente, no la contraseña de tu cuenta.

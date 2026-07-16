@@ -1,11 +1,8 @@
-"""
-main.py
-Punto de entrada principal de adaptIA.
-"""
-
+"""Punto de entrada principal de Orion adaptIA."""
 import os
 import sys
 import threading
+import traceback
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -20,81 +17,88 @@ from modules.action_manager import ActionManager
 from modules.executor import Executor
 
 logger = get_logger()
-
-# Ruta del audio temporal SIN espacios
 RUTA_AUDIO = os.path.join(TEMP_DIR, "comando.wav")
 
 
-def ciclo_voz():
-    """Ciclo principal de escucha y procesamiento de voz."""
-    logger.info(f"Iniciando {ASSISTANT_NAME}...")
-
-    speaker = Speaker()
-    listener = Listener()
-    transcriber = Transcriber()
-    brain = Brain()
-    memory = MemoryManager()
-    executor = Executor()
-    action_manager = ActionManager(speaker, listener, transcriber, executor)
-
-    speaker.hablar("Orion esta activo y listo. Di Orion para activarme.")
-
+def _ui_estado(texto, activo=False):
     try:
+        from menu import actualizar_estado_menu, log_menu
+        actualizar_estado_menu(texto, activo)
+        log_menu(texto)
+    except Exception:
+        pass
+
+
+def ciclo_voz():
+    memory = None
+    speaker = None
+    try:
+        _ui_estado("INICIANDO ORION")
+        logger.info(f"Iniciando {ASSISTANT_NAME}...")
+        speaker = Speaker()
+        _ui_estado("CARGANDO MICROFONO")
+        listener = Listener()
+        _ui_estado("CARGANDO WHISPER")
+        transcriber = Transcriber()
+        brain = Brain()
+        memory = MemoryManager()
+        executor = Executor()
+        action_manager = ActionManager(speaker, listener, transcriber, executor)
+
+        speaker.hablar("Orion esta activo. Di Orion para activarme.")
         while True:
-            # 1. Esperar palabra clave
+            _ui_estado("ESCUCHA PASIVA")
             listener.esperar_palabra_clave()
+            _ui_estado("ACTIVADO", True)
             speaker.hablar("Dime.")
 
-            # 2. Grabar comando
             audio = listener.grabar_comando()
             if audio is None:
                 speaker.hablar("No escuche nada.")
                 continue
-
-            # 3. Guardar audio en ruta sin espacios
-            ruta_guardada = listener.guardar_audio_temporal(audio, RUTA_AUDIO)
-            if not ruta_guardada:
-                speaker.hablar("Tuve un problema con el audio.")
+            ruta = listener.guardar_audio_temporal(audio, RUTA_AUDIO)
+            if not ruta:
+                speaker.hablar("Tuve un problema guardando el audio.")
                 continue
 
-            # 4. Transcribir
-            texto_usuario, confianza = transcriber.transcribir(ruta_guardada)
+            _ui_estado("TRANSCRIBIENDO", True)
+            texto_usuario, confianza = transcriber.transcribir(ruta)
             if not texto_usuario:
-                speaker.hablar("No logre entender, intenta de nuevo.")
+                speaker.hablar("No logre entender. Intenta de nuevo.")
                 continue
-
-            if confianza < MIN_TRANSCRIPTION_CONFIDENCE:
-                speaker.hablar("No estoy seguro de haber entendido, puedes repetirlo?")
-                continue
-
             logger.info(f"Usuario dijo: '{texto_usuario}'")
+            _ui_estado(f"COMANDO: {texto_usuario[:35]}", True)
 
-            # 5. Clasificar intencion con Groq
+            # Whisper puede dar confianza conservadora; solo rechazamos valores extremadamente bajos.
+            if confianza < max(0.15, MIN_TRANSCRIPTION_CONFIDENCE - 0.25):
+                speaker.hablar("No estoy seguro de haber entendido. Puedes repetirlo?")
+                continue
+
             contexto = memory.obtener_contexto_reciente()
             data_intencion = brain.procesar(texto_usuario, contexto)
-
-            # 6. Confirmar y ejecutar
             intencion, parametros, resultado, exitoso = action_manager.procesar_intencion(data_intencion)
-
-            # 7. Guardar en memoria
             memory.guardar_interaccion(texto_usuario, intencion, parametros, resultado, exitoso)
 
-    except KeyboardInterrupt:
-        logger.info("Orion detenido.")
-        speaker.hablar("Hasta luego.")
-    except Exception as e:
-        logger.exception(f"Error crítico en el ciclo de voz: {e}")
-        speaker.hablar("Tuve un error crítico.")
+    except Exception as exc:
+        mensaje = f"ERROR DE VOZ: {exc}"
+        logger.error(mensaje)
+        logger.error(traceback.format_exc())
+        _ui_estado(mensaje[:55])
+        if speaker:
+            try:
+                speaker.hablar("Orion encontro un error. Revisa la consola.")
+            except Exception:
+                pass
     finally:
-        memory.cerrar()
+        if memory:
+            memory.cerrar()
 
 
 if __name__ == "__main__":
     try:
         from menu import iniciar_menu
-        hilo_voz = threading.Thread(target=ciclo_voz, daemon=True)
-        hilo_voz.start()
+        threading.Thread(target=ciclo_voz, daemon=True, name="OrionVoice").start()
         iniciar_menu()
-    except Exception as e:
-        logger.warning(f"Menú no disponible, corriendo sin interfaz: {e}")
+    except Exception as exc:
+        logger.warning(f"Menu no disponible; ejecutando solo consola: {exc}")
         ciclo_voz()

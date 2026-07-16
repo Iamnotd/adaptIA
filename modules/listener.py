@@ -1,15 +1,8 @@
-"""
-modules/listener.py
-Captura de audio en tiempo real con microfono siempre abierto.
-Detecta la palabra clave "Orion" y graba el comando completo del usuario.
-Usa automaticamente el microfono predeterminado del sistema Windows.
-"""
+"""Captura de audio y detección de la palabra de activación Orion."""
 
 import os
 import unicodedata
-
 import speech_recognition as sr
-
 from config import WAKE_WORD, SILENCE_THRESHOLD_SECONDS, MAX_RECORDING_SECONDS
 from modules.logger import get_logger
 
@@ -17,112 +10,97 @@ logger = get_logger()
 
 
 def _normalizar(texto):
-    """Quita acentos y pasa a minusculas para comparar la palabra clave."""
-    texto = texto.lower().strip()
-    texto = unicodedata.normalize("NFD", texto)
-    texto = "".join(c for c in texto if unicodedata.category(c) != "Mn")
-    return texto
+    texto = unicodedata.normalize("NFD", texto.lower().strip())
+    return "".join(c for c in texto if unicodedata.category(c) != "Mn")
+
+
+def listar_microfonos():
+    try:
+        return sr.Microphone.list_microphone_names()
+    except Exception as exc:
+        logger.error(f"No se pudieron listar los microfonos: {exc}")
+        return []
 
 
 def _obtener_indice_microfono_principal():
-    """Busca automaticamente el mejor microfono disponible."""
     nombres_prioritarios = [
-        "microphone array (amd",
-        "microfono (realtek",
-        "microphone (realtek",
-        "microphone array",
-        "built-in microphone",
+        "microphone array", "microfono", "microphone", "realtek", "built-in"
     ]
     nombres_excluir = [
         "mezcla", "stereo mix", "output", "altavoz", "speaker",
         "headphones", "auriculares", "virtual", "asignador"
     ]
-
-    micros = sr.Microphone.list_microphone_names()
+    micros = listar_microfonos()
     for i, nombre in enumerate(micros):
-        nombre_lower = nombre.lower()
-        if any(excluir in nombre_lower for excluir in nombres_excluir):
+        bajo = nombre.lower()
+        if any(x in bajo for x in nombres_excluir):
             continue
-        for prioritario in nombres_prioritarios:
-            if prioritario in nombre_lower:
-                logger.info(f"Microfono seleccionado: [{i}] {nombre}")
-                return i
-
-    logger.info("Usando microfono predeterminado del sistema.")
+        if any(x in bajo for x in nombres_prioritarios):
+            logger.info(f"Microfono seleccionado: [{i}] {nombre}")
+            return i
+    logger.info("Usando el microfono predeterminado de Windows.")
     return None
 
 
 class Listener:
-    """Gestiona el microfono en modo de escucha pasiva continua."""
-
     def __init__(self):
         self.recognizer = sr.Recognizer()
         self.recognizer.dynamic_energy_threshold = True
         self.recognizer.pause_threshold = SILENCE_THRESHOLD_SECONDS
+        self.recognizer.non_speaking_duration = 0.5
 
         indice = _obtener_indice_microfono_principal()
-        if indice is not None:
-            self.microphone = sr.Microphone(device_index=indice)
-        else:
-            self.microphone = sr.Microphone()
+        try:
+            self.microphone = sr.Microphone(device_index=indice) if indice is not None else sr.Microphone()
+        except Exception as exc:
+            raise RuntimeError(
+                "No pude abrir el microfono. Revisa permisos de Windows y la instalacion de PyAudio."
+            ) from exc
 
-        logger.info("Calibrando microfono...")
+        logger.info("Calibrando microfono durante 1 segundo...")
         with self.microphone as source:
-            self.recognizer.adjust_for_ambient_noise(source, duration=1.5)
-        logger.info("Microfono listo. Orion esta en escucha pasiva.")
+            self.recognizer.adjust_for_ambient_noise(source, duration=1.0)
+        logger.info(f"Microfono listo. Umbral de energia: {self.recognizer.energy_threshold:.0f}")
 
     def esperar_palabra_clave(self):
-        """Escucha continuamente esperando la palabra clave 'Orion'."""
+        """Devuelve el texto reconocido cuando contiene Orion."""
+        logger.info("Escucha pasiva: di 'Orion'.")
         with self.microphone as source:
             while True:
                 try:
-                    audio = self.recognizer.listen(
-                        source, timeout=None, phrase_time_limit=3
-                    )
-                    texto = self.recognizer.recognize_google(audio, language="es-ES")
-                    texto_normalizado = _normalizar(texto)
-                    logger.debug(f"Escucha pasiva: '{texto}'")
-                    if WAKE_WORD in texto_normalizado:
-                        logger.info("Palabra clave 'Orion' detectada.")
-                        return True
+                    audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=5)
+                    texto = self.recognizer.recognize_google(audio, language="es-GT")
+                    logger.info(f"Escucha pasiva reconocio: '{texto}'")
+                    if WAKE_WORD in _normalizar(texto):
+                        logger.info("Palabra clave Orion detectada.")
+                        return texto
+                except sr.WaitTimeoutError:
+                    logger.debug("Sin voz; Orion sigue escuchando.")
                 except sr.UnknownValueError:
-                    continue
-                except sr.RequestError as e:
-                    logger.error(f"Error de conexión con el servicio de reconocimiento de voz: {e}")
-                    continue
-                except Exception as e:
-                    logger.exception(f"Error inesperado en escucha pasiva: {e}")
-                    continue
+                    logger.debug("Audio no entendible durante escucha pasiva.")
+                except sr.RequestError as exc:
+                    logger.error(f"Google Speech no esta disponible: {exc}")
+                    raise RuntimeError("No hay conexion para detectar la palabra Orion.") from exc
 
     def grabar_comando(self):
-        """Graba el comando del usuario tras activarse con 'Orion'."""
         with self.microphone as source:
             logger.info("Escuchando comando...")
             try:
-                audio = self.recognizer.listen(
-                    source,
-                    timeout=10,
-                    phrase_time_limit=MAX_RECORDING_SECONDS
-                )
+                audio = self.recognizer.listen(source, timeout=10, phrase_time_limit=MAX_RECORDING_SECONDS)
                 logger.info("Comando grabado.")
                 return audio
             except sr.WaitTimeoutError:
-                logger.warning("Tiempo de espera agotado.")
-                return None
-            except Exception as e:
-                logger.exception(f"Error grabando comando de voz: {e}")
+                logger.warning("No se detecto voz durante 10 segundos.")
                 return None
 
     def guardar_audio_temporal(self, audio, ruta_wav):
-        """Guarda el audio capturado como archivo .wav temporal para Whisper."""
         try:
             ruta_abs = os.path.abspath(ruta_wav)
-            carpeta = os.path.dirname(ruta_abs)
-            os.makedirs(carpeta, exist_ok=True)
-            with open(ruta_abs, "wb") as f:
-                f.write(audio.get_wav_data())
+            os.makedirs(os.path.dirname(ruta_abs), exist_ok=True)
+            with open(ruta_abs, "wb") as archivo:
+                archivo.write(audio.get_wav_data(convert_rate=16000, convert_width=2))
             logger.info(f"Audio guardado en: {ruta_abs}")
             return ruta_abs
-        except Exception as e:
-            logger.exception(f"Error guardando audio temporal en '{ruta_wav}': {e}")
+        except Exception as exc:
+            logger.error(f"Error guardando audio: {exc}")
             return None

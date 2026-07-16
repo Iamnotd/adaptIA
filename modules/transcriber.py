@@ -3,11 +3,9 @@ modules/transcriber.py
 Transcripción de audio a texto usando Whisper (OpenAI), ejecutado localmente.
 """
 
-import os
-
 import whisper
-
-from config import WHISPER_MODEL_SIZE, WHISPER_LANGUAGE
+import os
+from config import WHISPER_MODEL_SIZE, WHISPER_LANGUAGE, MIN_TRANSCRIPTION_CONFIDENCE
 from modules.logger import get_logger
 
 logger = get_logger()
@@ -46,5 +44,5 @@ class Transcriber:
             logger.info(f"Transcripcion: '{texto}' (confianza: {confianza:.2f})")
             return texto, confianza
         except Exception as e:
-            logger.exception(f"Error transcribiendo audio desde '{ruta_audio}': {e}")
+            logger.error(f"Error transcribiendo audio: {e}")
             return "", 0.0

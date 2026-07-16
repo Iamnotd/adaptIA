@@ -53,7 +53,7 @@ class MemoryManager:
             self.session.commit()
             logger.debug(f"Interacción guardada: {intencion}")
         except Exception as e:
-            logger.exception(f"Error guardando interacción en memoria: {e}")
+            logger.error(f"Error guardando interacción en memoria: {e}")
             self.session.rollback()
 
     def obtener_contexto_reciente(self, limite=MAX_CONTEXT_INTERACTIONS):
@@ -75,7 +75,7 @@ class MemoryManager:
                 })
             return contexto
         except Exception as e:
-            logger.exception(f"Error obteniendo contexto de memoria: {e}")
+            logger.error(f"Error obteniendo contexto de memoria: {e}")
             return []
 
     def cerrar(self):
